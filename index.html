@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cetak BAST MBG — SPPG Sleman Tempel Tambakrejo</title>
+<style>
+  :root{
+    --ink:#1f2a24;
+    --paper:#fbfaf7;
+    --line:#d8d3c4;
+    --accent:#5a7a5a;
+    --accent-dark:#3f5c40;
+    --warn:#a3492f;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  header.app{
+    background:var(--accent-dark);
+    color:#fff;
+    padding:18px 20px;
+    position:sticky; top:0; z-index:50;
+  }
+  header.app h1{margin:0; font-size:17px; font-weight:600;}
+  header.app p{margin:2px 0 0; font-size:12px; opacity:.8;}
+  nav.tabs{
+    display:flex; gap:0; background:#fff; border-bottom:1px solid var(--line);
+    position:sticky; top:62px; z-index:49;
+  }
+  nav.tabs button{
+    flex:1; padding:12px 8px; border:none; background:none; cursor:pointer;
+    font-size:13.5px; font-weight:600; color:#8a8578; border-bottom:3px solid transparent;
+  }
+  nav.tabs button.active{ color:var(--accent-dark); border-bottom-color:var(--accent); }
+  main{ max-width:960px; margin:0 auto; padding:16px 14px 90px; }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:16px; margin-bottom:14px;
+  }
+  .card h2{ margin:0 0 4px; font-size:15px; }
+  .card .hint{ font-size:12px; color:#847f70; margin:0 0 12px; }
+  label{ display:block; font-size:12.5px; font-weight:600; color:#4b463c; margin:10px 0 4px;}
+  input[type=text], input[type=date], input[type=time], input[type=number], textarea{
+    width:100%; padding:9px 10px; border:1px solid #cfc9b8; border-radius:7px;
+    font-size:14px; font-family:inherit; background:#fff;
+  }
+  textarea{ min-height:70px; resize:vertical; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .row > div{ flex:1; min-width:140px; }
+  .btn{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:10px 16px; border-radius:8px; border:1px solid var(--accent-dark);
+    background:var(--accent-dark); color:#fff; font-size:13.5px; font-weight:600; cursor:pointer;
+  }
+  .btn.secondary{ background:#fff; color:var(--accent-dark); }
+  .btn.ghost{ background:#fff; color:#7a7568; border-color:#cfc9b8; }
+  .btn.danger{ background:#fff; color:var(--warn); border-color:var(--warn); }
+  .btn.small{ padding:6px 10px; font-size:12px; }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+  .school-card{
+    border:1px solid var(--line); border-radius:9px; background:#fdfcfa;
+    padding:10px 12px; margin-bottom:10px;
+  }
+  .school-card .head{ display:flex; align-items:center; gap:8px; }
+  .school-card .head input[type=text]{ flex:1; font-weight:600; }
+  .kelas-editor{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); display:none; }
+  .kelas-editor.open{ display:block; }
+  .kelas-chip{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .kelas-chip .num{ width:24px; text-align:center; font-size:12px; color:#8a8578; }
+  .kelas-chip input[type=text]{ flex:1; padding:6px 8px; font-size:13px; }
+  .kelas-note{ font-size:11.5px; color:#8a8578; margin-top:6px; }
+
+  .toolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+  .status{ font-size:12px; color:var(--accent-dark); min-height:16px; }
+  .muted{ color:#8a8578; font-size:12px; }
+  .empty{ text-align:center; color:#8a8578; padding:20px 10px; font-size:13px; }
+
+  .menu-row{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .menu-row .num{ width:18px; font-size:12px; color:#8a8578; }
+
+  .daily-card{ border:1px solid var(--line); border-radius:9px; padding:12px; margin-bottom:10px; background:#fdfcfa; }
+  .daily-card .top{ display:flex; align-items:center; gap:8px; }
+  .daily-card .top .nm{ flex:1; font-weight:700; font-size:14.5px; }
+  .daily-card .fields{ display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+  .daily-card .fields > div{ flex:1; min-width:120px; }
+  .daily-card .fields label{ margin:0 0 3px; }
+  .porsi-table{ width:100%; border-collapse:collapse; margin-top:10px; font-size:12.5px; }
+  .porsi-table th, .porsi-table td{ border:1px solid var(--line); padding:5px 6px; text-align:center; }
+  .porsi-table td.lbl{ text-align:left; }
+  .porsi-table input{ width:64px; padding:5px; text-align:center; border:1px solid #d8d3c4; border-radius:5px; }
+  .porsi-total{ text-align:right; font-size:12.5px; font-weight:600; margin-top:4px; }
+
+  /* ---------- PRINT DOCUMENT STYLES ---------- */
+  #print-root{ display:none; }
+  @media print{
+    body *{ visibility:hidden; }
+    #print-root, #print-root *{ visibility:visible; }
+    #print-root{ display:block; position:absolute; top:0; left:0; width:100%; }
+    header.app, nav.tabs{ display:none; }
+  }
+  .doc-page{
+    width:190mm; min-height:277mm; margin:0 auto; padding:12mm 14mm;
+    font-family:'Times New Roman', Times, serif; color:#000; font-size:12.5px;
+    page-break-after:always; position:relative;
+  }
+  .doc-page:last-child{ page-break-after:auto; }
+  .doc-title{ text-align:center; font-weight:bold; font-size:13.5px; margin-bottom:14px; line-height:1.4; }
+  .bast-block{ margin-bottom:8px; }
+  .bast-block p{ margin:4px 0; line-height:1.7; }
+  .fillblank{ border-bottom:1px solid #000; padding:0 4px; font-weight:bold; }
+  .kv{ display:flex; margin:10px 0 4px; }
+  .kv .k{ width:150px; }
+  .kv .c{ width:14px; }
+  hr.sep{ border:none; border-top:1px solid #000; margin:22px 0 14px; }
+  .sppg-addr{ text-align:center; margin:6px 0 18px; }
+  .sppg-addr .nm{ font-weight:bold; }
+  .checklist-head p{ margin:3px 0; }
+  table.doc-table{ width:100%; border-collapse:collapse; margin-top:10px; font-size:11.5px; }
+  table.doc-table th, table.doc-table td{ border:1px solid #000; padding:4px 5px; text-align:center; }
+  table.doc-table td.left{ text-align:left; }
+  .concl{ margin-top:8px; font-size:12px; }
+  .notes{ font-size:11px; margin-top:10px; }
+  .notes p{ margin:2px 0; }
+  .score-legend{ display:flex; gap:30px; font-size:11.5px; margin-top:8px; }
+  .sign-block-3{ display:flex; justify-content:space-between; margin-top:20px; font-size:12px; }
+  .sign-block-3 .col{ width:32%; text-align:center; }
+  .sign-block-3 .role{ margin-bottom:50px; }
+  .sign-block-3 .name{ font-weight:bold; text-decoration:underline; }
+  .sj-header-table{ width:100%; border-collapse:collapse; margin-bottom:10px; font-size:12.5px; }
+  .sj-header-table td{ padding:2px 4px; vertical-align:top; }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <h1>Cetak BAST &amp; Surat Jalan — Program MBG</h1>
+  <p>SPPG Kab. Sleman Tempel Tambakrejo</p>
+</header>
+
+<nav class="tabs">
+  <button id="tabBtnSchools" class="active" onclick="switchTab('schools')">Data Sekolah</button>
+  <button id="tabBtnDaily" onclick="switchTab('daily')">Cetak Harian</button>
+</nav>
+
+<main>
+
+  <!-- ===================== TAB: DATA SEKOLAH ===================== -->
+  <section id="tabSchools">
+    <div class="card">
+      <h2>Daftar Sekolah</h2>
+      <p class="hint">Isi sekali saja. Klik <b>"Atur Kelas"</b> di tiap sekolah untuk menyesuaikan daftar kelas (PAUD/TK/SD/SMP/SMA bisa beda-beda) — ini dipakai otomatis untuk Surat Jalan tiap hari, tinggal isi jumlah porsinya saja nanti.</p>
+      <div id="schoolList"></div>
+      <div class="toolbar">
+        <button class="btn secondary" onclick="addSchool()">+ Tambah Sekolah</button>
+        <button class="btn" onclick="saveSchools()">Simpan Daftar Sekolah</button>
+        <span class="status" id="schoolStatus"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Data Tetap (Tanda Tangan &amp; SPPG)</h2>
+      <p class="hint">Nama-nama ini biasanya sama setiap hari, jadi cukup diisi sekali.</p>
+      <div class="row">
+        <div>
+          <label>Nama SPPG</label>
+          <input type="text" id="setSppgName" value="SPPG Kabupaten Sleman Tempel Tambakrejo">
+        </div>
+        <div>
+          <label>Alamat SPPG</label>
+          <input type="text" id="setSppgAddr" value="Jl. Tempel-Seyegan, Tambakrejo, Tempel, Sleman">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Nama Ahli Gizi</label>
+          <input type="text" id="setAhliGizi" value="Dewi Nugraha Primastuti, S.Gz.">
+        </div>
+        <div>
+          <label>Nama Kepala SPPG</label>
+          <input type="text" id="setKepalaSppg" value="Robertus Danu Priyambodo, S.Hut.">
+        </div>
+        <div>
+          <label>Nama Koordinator Lapangan</label>
+          <input type="text" id="setKoordinator" value="M. Syamsul Hadi">
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="btn" onclick="saveSettings()">Simpan Data Tetap</button>
+        <span class="status" id="settingsStatus"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB: CETAK HARIAN ===================== -->
+  <section id="tabDaily" style="display:none;">
+    <div class="card">
+      <h2>Data Hari Ini</h2>
+      <div class="row">
+        <div>
+          <label>Tanggal Pengiriman</label>
+          <input type="date" id="dailyDate">
+        </div>
+        <div>
+          <label>Hari</label>
+          <input type="text" id="dailyDay" readonly style="background:#f1efe7;">
+        </div>
+        <div>
+          <label>Driver (default, bisa diubah per sekolah)</label>
+          <input type="text" id="dailyDriver" placeholder="Nama driver">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Menu Hari Ini (Halaman 2 — Uji Organoleptik)</h2>
+      <p class="hint">Isi nama menu hari ini. Otomatis dipakai sama untuk semua sekolah, tidak perlu isi berkali-kali.</p>
+      <div id="menuRows"></div>
+    </div>
+
+    <div class="card">
+      <h2>Sekolah &amp; Jumlah Porsi Hari Ini</h2>
+      <p class="hint">Centang sekolah yang mau dicetak hari ini. Jumlah porsi diisi sesuai struktur kelas masing-masing sekolah (atur di tab "Data Sekolah").</p>
+      <div class="toolbar" style="margin-top:0;">
+        <label style="display:flex; align-items:center; gap:6px; margin:0;"><input type="checkbox" id="checkAll" checked onchange="toggleAll(this)"> Pilih semua</label>
+        <span class="muted" id="selectedCount"></span>
+      </div>
+      <div id="dailyCards" style="margin-top:10px;"></div>
+      <div class="toolbar">
+        <button class="btn" onclick="printSelected()">🖨️ Cetak Lengkap (3 Halaman)</button>
+        <button class="btn ghost" onclick="printHalaman(1)">Halaman 1 saja</button>
+        <button class="btn ghost" onclick="printHalaman(2)">Halaman 2 saja</button>
+        <button class="btn ghost" onclick="printHalaman(3)">Halaman 3 saja</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="print-root"></div>
+
+<script>
+/* ---------------- STATE ---------------- */
+let schools = [];   // [{id, nama, kelas:[{id,label}]}]
+let settings = {
+  sppgName:'SPPG Kabupaten Sleman Tempel Tambakrejo',
+  sppgAddr:'Jl. Tempel-Seyegan, Tambakrejo, Tempel, Sleman',
+  ahliGizi:'Dewi Nugraha Primastuti, S.Gz.',
+  kepalaSppg:'Robertus Danu Priyambodo, S.Hut.',
+  koordinator:'M. Syamsul Hadi'
+};
+let dailyData = {};        // schoolId -> {checked, jam, driver, porsi:{kelasRowId:val}, gtk, sampel}
+let dailyMenu = ['','','','',''];  // 5 nama makanan, dipakai untuk semua sekolah
+let openKelasEditor = {};  // schoolId -> bool, UI state only
+
+const DAY_NAMES = ['Minggu','Senin','Selasa','Rabu','Kamis',"Jum'at",'Sabtu'];
+const MONTH_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+/* Storage universal: pakai window.storage kalau tersedia (mis. dibuka lewat Claude),
+   kalau tidak tersedia (mis. dihosting sendiri) otomatis pakai localStorage browser. */
+const storageAPI = {
+  async get(key){
+    if(window.storage) return window.storage.get(key);
+    const v = localStorage.getItem('bast_' + key);
+    if(v === null) throw new Error('not found');
+    return {key, value:v};
+  },
+  async set(key, value){
+    if(window.storage) return window.storage.set(key, value, false);
+    localStorage.setItem('bast_' + key, value);
+    return {key, value};
+  }
+};
+
+function uid(prefix){ return (prefix||'id') + '_' + Math.random().toString(36).slice(2,9); }
+function defaultKelas(){
+  return ['1','2','3','4','5','6'].map(l=>({id:uid('k'), label:l}));
+}
+
+/* ---------------- TABS ---------------- */
+function switchTab(tab){
+  document.getElementById('tabSchools').style.display = tab==='schools' ? 'block' : 'none';
+  document.getElementById('tabDaily').style.display = tab==='daily' ? 'block' : 'none';
+  document.getElementById('tabBtnSchools').classList.toggle('active', tab==='schools');
+  document.getElementById('tabBtnDaily').classList.toggle('active', tab==='daily');
+  if(tab==='daily') renderDailyCards();
+}
+
+/* ---------------- LOAD / SAVE ---------------- */
+async function loadAll(){
+  try{
+    const r = await storageAPI.get('schools-list-v2');
+    if(r && r.value) schools = JSON.parse(r.value);
+  }catch(e){ schools = []; }
+
+  if(schools.length === 0){
+    try{
+      const r1 = await storageAPI.get('schools-list');
+      if(r1 && r1.value){
+        const old = JSON.parse(r1.value);
+        schools = old.map(s=>({id:s.id||uid('s'), nama:s.nama, kelas: defaultKelas()}));
+      }
+    }catch(e){ /* ignore */ }
+  }
+
+  try{
+    const r = await storageAPI.get('settings');
+    if(r && r.value) settings = Object.assign(settings, JSON.parse(r.value));
+  }catch(e){ /* keep defaults */ }
+
+  try{
+    const r = await storageAPI.get('daily-menu');
+    if(r && r.value) dailyMenu = JSON.parse(r.value);
+  }catch(e){ /* keep defaults */ }
+
+  if(schools.length === 0){
+    schools = [{id: uid('s'), nama:'MI AL IMAN', kelas: defaultKelas()}];
+  }
+  schools.forEach(s=>{ if(!s.kelas || s.kelas.length===0) s.kelas = defaultKelas(); });
+
+  document.getElementById('setSppgName').value = settings.sppgName;
+  document.getElementById('setSppgAddr').value = settings.sppgAddr;
+  document.getElementById('setAhliGizi').value = settings.ahliGizi;
+  document.getElementById('setKepalaSppg').value = settings.kepalaSppg;
+  document.getElementById('setKoordinator').value = settings.koordinator;
+
+  renderSchoolList();
+  renderMenuRows();
+
+  const today = new Date();
+  document.getElementById('dailyDate').value = today.toISOString().slice(0,10);
+  updateDayLabel();
+  initDailyData();
+}
+
+function escapeAttr(s){ return String(s??'').replace(/"/g,'&quot;'); }
+function escapeHtml(s){
+  return String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function flash(id, msg){
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  setTimeout(()=>{ el.textContent=''; }, 2500);
+}
+
+/* ---------------- SCHOOL LIST + KELAS EDITOR ---------------- */
+function renderSchoolList(){
+  const box = document.getElementById('schoolList');
+  box.innerHTML = '';
+  if(schools.length===0){
+    box.innerHTML = '<div class="empty">Belum ada sekolah. Tambahkan di atas.</div>';
+    return;
+  }
+  schools.forEach(s=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'school-card';
+    const isOpen = !!openKelasEditor[s.id];
+    wrap.innerHTML = `
+      <div class="head">
+        <input type="text" value="${escapeAttr(s.nama)}" placeholder="Nama sekolah" onchange="renameSchool('${s.id}', this.value)">
+        <button class="btn small ghost" onclick="toggleKelasEditor('${s.id}')">${isOpen?'Tutup':'Atur Kelas'}</button>
+        <button class="btn small danger" onclick="removeSchool('${s.id}')">Hapus</button>
+      </div>
+      <div class="kelas-editor ${isOpen?'open':''}" id="kelasEditor_${s.id}">
+        <div id="kelasChips_${s.id}"></div>
+        <button class="btn small secondary" onclick="addKelasRow('${s.id}')">+ Tambah Baris Kelas</button>
+        <p class="kelas-note">Isi bebas: bisa "1","2","VII","XI IPA","TK A", dll — sesuai tingkat di sekolah ini. Baris GTK &amp; SAMPEL otomatis ditambahkan di Surat Jalan.</p>
+      </div>
+    `;
+    box.appendChild(wrap);
+    renderKelasChips(s.id);
+  });
+}
+function toggleKelasEditor(schoolId){
+  openKelasEditor[schoolId] = !openKelasEditor[schoolId];
+  renderSchoolList();
+}
+function renderKelasChips(schoolId){
+  const s = schools.find(x=>x.id===schoolId);
+  const box = document.getElementById('kelasChips_'+schoolId);
+  if(!s || !box) return;
+  box.innerHTML = '';
+  s.kelas.forEach((k,idx)=>{
+    const row = document.createElement('div');
+    row.className = 'kelas-chip';
+    row.innerHTML = `
+      <div class="num">${idx+1}</div>
+      <input type="text" value="${escapeAttr(k.label)}" onchange="renameKelas('${schoolId}','${k.id}', this.value)">
+      <button class="btn small danger" onclick="removeKelas('${schoolId}','${k.id}')">✕</button>
+    `;
+    box.appendChild(row);
+  });
+}
+function addKelasRow(schoolId){
+  const s = schools.find(x=>x.id===schoolId);
+  if(!s) return;
+  s.kelas.push({id:uid('k'), label:''});
+  renderKelasChips(schoolId);
+}
+function renameKelas(schoolId, kelasId, val){
+  const s = schools.find(x=>x.id===schoolId);
+  if(!s) return;
+  const k = s.kelas.find(x=>x.id===kelasId);
+  if(k) k.label = val;
+}
+function removeKelas(schoolId, kelasId){
+  const s = schools.find(x=>x.id===schoolId);
+  if(!s) return;
+  s.kelas = s.kelas.filter(x=>x.id!==kelasId);
+  renderKelasChips(schoolId);
+}
+
+function addSchool(){
+  const s = {id: uid('s'), nama:'', kelas: defaultKelas()};
+  schools.push(s);
+  openKelasEditor[s.id] = true;
+  renderSchoolList();
+  const inputs = document.querySelectorAll('#schoolList .head input[type=text]');
+  if(inputs.length) inputs[inputs.length-1].focus();
+}
+function renameSchool(id, val){
+  const s = schools.find(x=>x.id===id);
+  if(s) s.nama = val;
+}
+function removeSchool(id){
+  schools = schools.filter(x=>x.id!==id);
+  delete dailyData[id];
+  renderSchoolList();
+}
+async function saveSchools(){
+  schools = schools.filter(s=>s.nama.trim()!=='');
+  schools.forEach(s=>{ s.kelas = s.kelas.filter(k=>k.label.trim()!==''); });
+  renderSchoolList();
+  try{
+    await storageAPI.set('schools-list-v2', JSON.stringify(schools));
+    flash('schoolStatus','Tersimpan ✓');
+    initDailyData(true);
+  }catch(e){
+    flash('schoolStatus','Gagal menyimpan, coba lagi.');
+  }
+}
+async function saveSettings(){
+  settings.sppgName = document.getElementById('setSppgName').value;
+  settings.sppgAddr = document.getElementById('setSppgAddr').value;
+  settings.ahliGizi = document.getElementById('setAhliGizi').value;
+  settings.kepalaSppg = document.getElementById('setKepalaSppg').value;
+  settings.koordinator = document.getElementById('setKoordinator').value;
+  try{
+    await storageAPI.set('settings', JSON.stringify(settings));
+    flash('settingsStatus','Tersimpan ✓');
+  }catch(e){
+    flash('settingsStatus','Gagal menyimpan, coba lagi.');
+  }
+}
+
+/* ---------------- MENU HARIAN (halaman 2) ---------------- */
+function renderMenuRows(){
+  const box = document.getElementById('menuRows');
+  box.innerHTML = '';
+  for(let i=0;i<5;i++){
+    const row = document.createElement('div');
+    row.className = 'menu-row';
+    row.innerHTML = `
+      <div class="num">${i+1}.</div>
+      <input type="text" placeholder="Nama makanan ${i+1} (kosongkan jika tidak ada)" value="${escapeAttr(dailyMenu[i]||'')}" onchange="setMenu(${i}, this.value)">
+    `;
+    box.appendChild(row);
+  }
+}
+function setMenu(idx, val){
+  dailyMenu[idx] = val;
+  storageAPI.set('daily-menu', JSON.stringify(dailyMenu)).catch(()=>{});
+}
+
+/* ---------------- DAILY ---------------- */
+function updateDayLabel(){
+  const val = document.getElementById('dailyDate').value;
+  if(!val){ document.getElementById('dailyDay').value=''; return; }
+  const d = new Date(val + 'T00:00:00');
+  document.getElementById('dailyDay').value = DAY_NAMES[d.getDay()];
+}
+document.getElementById('dailyDate').addEventListener('change', updateDayLabel);
+
+function initDailyData(force){
+  schools.forEach(s=>{
+    if(!dailyData[s.id] || force){
+      const existing = dailyData[s.id];
+      dailyData[s.id] = {
+        checked: existing ? existing.checked : true,
+        jam: existing ? existing.jam : '',
+        driver: existing ? existing.driver : '',
+        gtk: existing ? existing.gtk : '',
+        sampel: existing ? existing.sampel : '',
+        porsi: (existing && existing.porsi) ? existing.porsi : {}
+      };
+    }
+    s.kelas.forEach(k=>{
+      if(!(k.id in dailyData[s.id].porsi)) dailyData[s.id].porsi[k.id] = '';
+    });
+  });
+}
+
+function renderDailyCards(){
+  initDailyData();
+  const box = document.getElementById('dailyCards');
+  box.innerHTML = '';
+  if(schools.length===0){
+    box.innerHTML = '<div class="empty">Belum ada sekolah. Tambahkan dulu di tab "Data Sekolah".</div>';
+    updateSelectedCount();
+    return;
+  }
+  schools.forEach(s=>{
+    const d = dailyData[s.id];
+    const card = document.createElement('div');
+    card.className = 'daily-card';
+    let rowsHtml = s.kelas.map(k=>`
+      <tr>
+        <td class="lbl">Kelas ${escapeHtml(k.label)}</td>
+        <td><input type="number" min="0" value="${d.porsi[k.id]}" onchange="setPorsi('${s.id}','${k.id}', this.value); recalcTotal('${s.id}')"></td>
+      </tr>`).join('');
+    rowsHtml += `
+      <tr>
+        <td class="lbl">GTK</td>
+        <td><input type="number" min="0" value="${d.gtk}" onchange="setField('${s.id}','gtk',this.value); recalcTotal('${s.id}')"></td>
+      </tr>
+      <tr>
+        <td class="lbl">SAMPEL</td>
+        <td><input type="number" min="0" value="${d.sampel}" onchange="setField('${s.id}','sampel',this.value); recalcTotal('${s.id}')"></td>
+      </tr>`;
+    card.innerHTML = `
+      <div class="top">
+        <input type="checkbox" ${d.checked?'checked':''} onchange="setField('${s.id}','checked',this.checked); updateSelectedCount();">
+        <div class="nm">${escapeHtml(s.nama)}</div>
+        <button class="btn small ghost" onclick="printOne('${s.id}')">Cetak 3 Halaman</button>
+      </div>
+      <div class="fields">
+        <div>
+          <label>Jam Kirim</label>
+          <input type="time" value="${d.jam}" onchange="setField('${s.id}','jam',this.value)">
+        </div>
+        <div>
+          <label>Driver (kosongkan = pakai default)</label>
+          <input type="text" value="${escapeAttr(d.driver)}" placeholder="ikut driver default" onchange="setField('${s.id}','driver',this.value)">
+        </div>
+      </div>
+      <table class="porsi-table">
+        <thead><tr><th style="text-align:left;">Kelas</th><th>Jumlah Porsi</th></tr></thead>
+        <tbody id="porsiBody_${s.id}">${rowsHtml}</tbody>
+      </table>
+      <div class="porsi-total" id="total_${s.id}">Total: ${calcTotal(s,d)}</div>
+    `;
+    box.appendChild(card);
+  });
+  updateSelectedCount();
+}
+function setField(id, field, val){ dailyData[id][field] = val; }
+function setPorsi(schoolId, kelasId, val){ dailyData[schoolId].porsi[kelasId] = val; }
+function calcTotal(s, d){
+  let total = s.kelas.reduce((sum,k)=> sum + (parseInt(d.porsi[k.id])||0), 0);
+  total += (parseInt(d.gtk)||0) + (parseInt(d.sampel)||0);
+  return total;
+}
+function recalcTotal(schoolId){
+  const s = schools.find(x=>x.id===schoolId);
+  const d = dailyData[schoolId];
+  document.getElementById('total_'+schoolId).textContent = 'Total: ' + calcTotal(s,d);
+}
+function toggleAll(cb){
+  schools.forEach(s=> dailyData[s.id].checked = cb.checked);
+  renderDailyCards();
+}
+function updateSelectedCount(){
+  const n = schools.filter(s=>dailyData[s.id] && dailyData[s.id].checked).length;
+  document.getElementById('selectedCount').textContent = n + ' sekolah terpilih';
+}
+
+/* ---------------- PRINT GENERATION ---------------- */
+function formatTanggalPanjang(dateStr){
+  if(!dateStr) return '<span class="fillblank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.getDate() + ' ' + MONTH_NAMES[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function halaman1HTML(schoolName, hari, tanggalLong, jam){
+  return `
+    <div class="doc-page">
+      <div class="doc-title">BERITA ACARA PENERIMAAN PAKET MAKANAN<br>PROGRAM MAKAN BERGIZI GRATIS</div>
+      <div class="bast-block">
+        <p>Pada Hari <span class="fillblank">${escapeHtml(hari || '.......................')}</span>
+        tanggal <span class="fillblank">${tanggalLong}</span>
+        jam <span class="fillblank">${jam || '..........'}</span>
+        telah <b>diterima</b> paket makanan sejumlah :
+        <span class="fillblank">.......................</span> Paket Makanan Bergizi dari
+        Satuan Pelayanan Pemenuhan Gizi (SPPG) Kab. Sleman Tempel Tambakrejo.</p>
+      </div>
+      <div class="kv"><div class="k">Yang menyerahkan</div><div class="c">:</div><div class="fillblank" style="flex:1;">&nbsp;</div></div>
+      <div class="kv"><div class="k">Nomor Telpon</div><div class="c">:</div><div class="fillblank" style="flex:1;">&nbsp;</div></div>
+      <div class="kv" style="margin-top:24px;"><div class="k">Diterima oleh</div><div class="c">:</div><div class="fillblank" style="flex:1;">&nbsp;</div></div>
+      <p style="margin-left:150px; font-weight:bold;">PIC ${escapeHtml(schoolName)}</p>
+      <div class="kv"><div class="k">Nomor Telpon</div><div class="c">:</div><div class="fillblank" style="flex:1;">&nbsp;</div></div>
+    </div>
+  `;
+}
+
+function halaman2HTML(schoolName, hari, tanggalLong, jam){
+  const foodRows = [0,1,2,3,4].map(i=>{
+    const nama = dailyMenu[i] ? escapeHtml(dailyMenu[i]) : '&nbsp;';
+    return `<tr><td>${i+1}</td><td class="left">${nama}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+  }).join('');
+
+  return `
+    <div class="doc-page">
+      <div class="doc-title">BERITA ACARA PENERIMAAN PAKET MAKANAN<br>PROGRAM MAKAN BERGIZI GRATIS</div>
+      <div class="bast-block">
+        <p>Pada Hari <span class="fillblank">${escapeHtml(hari || '.......................')}</span>
+        tanggal <span class="fillblank">${tanggalLong}</span>
+        jam <span class="fillblank">${jam || '..........'}</span>
+        telah <b>diserahkan</b> paket makanan sejumlah :
+        <span class="fillblank">.......................</span> Paket Makanan Bergizi dari
+        Satuan Pelayanan Pemenuhan Gizi (SPPG) Kab. Sleman Tempel Tambakrejo.</p>
+      </div>
+      <div class="kv"><div class="k">Yang menyerahkan</div><div class="c">:</div><div class="fillblank" style="flex:1;">&nbsp;</div></div>
+      <div class="kv"><div class="k">Nomor Telpon</div><div class="c">:</div><div class="fillblank" style="flex:1;">&nbsp;</div></div>
+      <div class="kv" style="margin-top:24px;"><div class="k">Diterima oleh</div><div class="c">:</div><div class="fillblank" style="flex:1;">&nbsp;</div></div>
+      <p style="margin-left:150px; font-weight:bold;">PIC ${escapeHtml(schoolName)}</p>
+      <div class="kv"><div class="k">Nomor Telpon</div><div class="c">:</div><div class="fillblank" style="flex:1;">&nbsp;</div></div>
+
+      <hr class="sep">
+      <div class="sppg-addr">
+        <div class="nm">${escapeHtml(settings.sppgName.toUpperCase())}</div>
+        <div>${escapeHtml(settings.sppgAddr)}</div>
+      </div>
+      <div class="doc-title" style="margin-bottom:10px;">CHECKLIST UJI ORGANOLEPTIK</div>
+      <div class="checklist-head">
+        <p>Nama Pemeriksa &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <span class="fillblank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></p>
+        <p>Tempat Pemeriksaan &nbsp;&nbsp;&nbsp;&nbsp;: Satuan Pendidikan</p>
+        <p>Nama Tempat Pemeriksaan : <b>${escapeHtml(schoolName)}</b></p>
+        <p>Tanggal Pemeriksaan &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${tanggalLong}</p>
+        <p>Waktu Pemeriksaan &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <span class="fillblank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></p>
+      </div>
+      <table class="doc-table">
+        <tr>
+          <th rowspan="2">No</th>
+          <th rowspan="2">Nama Makanan</th>
+          <th colspan="4">Hasil Pemeriksaan (skor 1-5)</th>
+          <th rowspan="2">Sebelum Pengantaran / Saat Tiba di Lokasi / Sebelum dikonsumsi</th>
+          <th rowspan="2">Ket</th>
+        </tr>
+        <tr><th>Rasa</th><th>Warna</th><th>Aroma</th><th>Tekstur</th></tr>
+        ${foodRows}
+      </table>
+      <p class="concl"><b>Kesimpulan Menu MBG:</b> Aman / Tidak Aman dikonsumsi <span style="margin-left:30px;">(coret salah satu)</span></p>
+      <div class="notes">
+        <p>Catatan:</p>
+        <p>- Silahkan dipilih salah satu untuk pengisian hasil pelaksanaan uji organoleptik (Sebelum Pengantaran/Saat Tiba di Lokasi/Sebelum dikonsumsi)</p>
+        <p>- Form dibawa oleh sopir untuk diberikan ke penanggung jawab program MBG dan diambil kembali bersamaan dengan pengambilan ompreng MBG dan dibawa kembali ke SPPG.</p>
+      </div>
+      <div class="score-legend">
+        <div>Cukup : 3 &nbsp;&nbsp;&nbsp; Baik : 4</div>
+        <div>Kurang : 2 &nbsp;&nbsp;&nbsp; Sangat Baik : 5</div>
+        <div>Tidak Baik : 1</div>
+      </div>
+      <div class="sign-block-3">
+        <div class="col">
+          <div class="role">Mengetahui,<br>Ahli Gizi</div>
+          <div class="name">${escapeHtml(settings.ahliGizi)}</div>
+        </div>
+        <div class="col">&nbsp;</div>
+        <div class="col">
+          <div class="role">Pemeriksa,</div>
+          <div class="name">.............................</div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:14px;">
+        <div>Kepala SPPG</div>
+        <div style="margin-top:46px; font-weight:bold; text-decoration:underline;">${escapeHtml(settings.kepalaSppg)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function halaman3HTML(schoolName, hari, tanggalLong, jam, driver, s, d){
+  let no = 0;
+  let rowsHtml = s.kelas.map(k=>{
+    no++;
+    const porsi = d.porsi[k.id] || '';
+    return `<tr><td>${no}</td><td>${escapeHtml(k.label)}</td><td>${porsi}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+  }).join('');
+  rowsHtml += `
+    <tr><td>&nbsp;</td><td>GTK</td><td>${d.gtk||''}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td>&nbsp;</td><td>SAMPEL</td><td>${d.sampel||''}</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  `;
+  const total = calcTotal(s, d);
+
+  return `
+    <div class="doc-page">
+      <div class="doc-title">SURAT JALAN<br>PROGRAM MAKAN BERGIZI GRATIS<br>${escapeHtml(settings.sppgName.toUpperCase())}</div>
+      <table class="sj-header-table">
+        <tr>
+          <td style="width:15%;">Kepada</td><td style="width:5%;">:</td><td style="width:45%; font-weight:bold;">${escapeHtml(schoolName)}</td>
+          <td style="width:20%;">Hari, Tanggal</td><td style="width:5%;">:</td><td>${escapeHtml(hari||'')}, ${tanggalLong}</td>
+        </tr>
+        <tr>
+          <td colspan="3">&nbsp;</td>
+          <td>Waktu Pengiriman</td><td>:</td><td>${jam || ''}</td>
+        </tr>
+        <tr>
+          <td colspan="3">&nbsp;</td>
+          <td>Driver</td><td>:</td><td>${escapeHtml(driver||'')}</td>
+        </tr>
+      </table>
+      <table class="doc-table">
+        <tr>
+          <th rowspan="2">No.</th><th rowspan="2">Kelas</th><th rowspan="2">Jumlah Porsi</th>
+          <th colspan="2">Jumlah Alat Makan</th><th rowspan="2">Keterangan</th>
+        </tr>
+        <tr><th>Sebelum</th><th>Sesudah</th></tr>
+        ${rowsHtml}
+        <tr><td colspan="2"><b>Total</b></td><td><b>${total}</b></td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+      </table>
+      <div class="sign-block-3" style="margin-top:26px;">
+        <div class="col">
+          <div class="role">Diperiksa oleh,<br>Ahli Gizi,</div>
+          <div class="name">${escapeHtml(settings.ahliGizi)}</div>
+        </div>
+        <div class="col">
+          <div class="role">Diterima Oleh,<br>Koordinator Lapangan,</div>
+          <div class="name">${escapeHtml(settings.koordinator)}</div>
+        </div>
+        <div class="col">
+          <div class="role">Pihak Sekolah,</div>
+          <div class="name">......................................</div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:26px;">
+        <div>Tim Distribusi,</div>
+        <div style="margin-top:46px;">......................................</div>
+      </div>
+    </div>
+  `;
+}
+
+function contextFor(schoolId){
+  const s = schools.find(x=>x.id===schoolId);
+  const d = dailyData[schoolId];
+  const hari = document.getElementById('dailyDay').value;
+  const tanggalLong = formatTanggalPanjang(document.getElementById('dailyDate').value);
+  const jam = d.jam;
+  const driver = d.driver || document.getElementById('dailyDriver').value;
+  return {s, d, hari, tanggalLong, jam, driver};
+}
+
+function printOne(schoolId){
+  const {s, d, hari, tanggalLong, jam, driver} = contextFor(schoolId);
+  let html = halaman1HTML(s.nama, hari, tanggalLong, jam);
+  html += halaman2HTML(s.nama, hari, tanggalLong, jam);
+  html += halaman3HTML(s.nama, hari, tanggalLong, jam, driver, s, d);
+  document.getElementById('print-root').innerHTML = html;
+  window.print();
+}
+
+function getSelectedSchools(){
+  return schools.filter(s=> dailyData[s.id] && dailyData[s.id].checked);
+}
+
+function printSelected(){
+  const selected = getSelectedSchools();
+  if(selected.length===0){ alert('Belum ada sekolah yang dicentang.'); return; }
+  let html = '';
+  selected.forEach(s=>{
+    const {hari, tanggalLong, jam, driver, d} = contextFor(s.id);
+    html += halaman1HTML(s.nama, hari, tanggalLong, jam);
+    html += halaman2HTML(s.nama, hari, tanggalLong, jam);
+    html += halaman3HTML(s.nama, hari, tanggalLong, jam, driver, s, d);
+  });
+  document.getElementById('print-root').innerHTML = html;
+  window.print();
+}
+
+function printHalaman(num){
+  const selected = getSelectedSchools();
+  if(selected.length===0){ alert('Belum ada sekolah yang dicentang.'); return; }
+  let html = '';
+  selected.forEach(s=>{
+    const {hari, tanggalLong, jam, driver, d} = contextFor(s.id);
+    if(num===1) html += halaman1HTML(s.nama, hari, tanggalLong, jam);
+    if(num===2) html += halaman2HTML(s.nama, hari, tanggalLong, jam);
+    if(num===3) html += halaman3HTML(s.nama, hari, tanggalLong, jam, driver, s, d);
+  });
+  document.getElementById('print-root').innerHTML = html;
+  window.print();
+}
+
+/* ---------------- INIT ---------------- */
+loadAll();
+</script>
+</body>
+</html>
