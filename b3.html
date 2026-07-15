@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+<title>MBG B3 · Entri Data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+  html, body { margin: 0; padding: 0; background: #FAF7F2; }
+  * { box-sizing: border-box; }
+</style>
+
+<!-- React -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- Babel standalone (JSX in-browser, no build step) -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- XLSX (SheetJS) for Excel export -->
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useMemo } = React;
+
+/* ---------------- Icons (inline SVG, lucide-style, no extra dependency) ---------------- */
+function Icon({ children, size = 16, color = "currentColor", style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      {children}
+    </svg>
+  );
+}
+const Plus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+const X = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
+const Check = (p) => <Icon {...p}><polyline points="20 6 9 17 4 12"/></Icon>;
+const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></Icon>;
+const Pencil = (p) => <Icon {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></Icon>;
+const Download = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
+const Printer = (p) => <Icon {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></Icon>;
+const MapPinned = (p) => <Icon {...p}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></Icon>;
+const ClipboardList = (p) => <Icon {...p}><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></Icon>;
+const Users2 = (p) => <Icon {...p}><path d="M14 19a6 6 0 0 0-12 0"/><circle cx="8" cy="9" r="4"/><path d="M22 19a6 6 0 0 0-6-6 4 4 0 1 0 0-8"/></Icon>;
+const LogOut = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
+
+/* ---------------- localStorage-backed config store (replaces window.storage) ---------------- */
+const storage = {
+  get: async (key) => {
+    const v = localStorage.getItem(key);
+    return v !== null ? { value: v } : null;
+  },
+  set: async (key, value) => {
+    localStorage.setItem(key, value);
+    return { key, value };
+  },
+  delete: async (key) => {
+    localStorage.removeItem(key);
+    return { key, deleted: true };
+  },
+};
+
+/* ---------------- App logic (ported from entri-mbg.tsx) ---------------- */
+const CATEGORY_META = {
+  baduta: { label: "Baduta", sub: "0–23 bulan", color: "#E8A33D", bg: "#FDF3E3" },
+  balita: { label: "Balita", sub: "24–59 bulan", color: "#2F9C95", bg: "#E6F4F3" },
+  ibu_menyusui: { label: "Ibu Menyusui", sub: "", color: "#C1666B", bg: "#FBEAEB" },
+};
+
+function calcKategori(tanggalLahir) {
+  if (!tanggalLahir) return "";
+  const dob = new Date(tanggalLahir);
+  const now = new Date();
+  let months = (now.getFullYear() - dob.getFullYear()) * 12 + (now.getMonth() - dob.getMonth());
+  if (now.getDate() < dob.getDate()) months -= 1;
+  if (months < 0) return "";
+  if (months < 24) return "baduta";
+  if (months < 60) return "balita";
+  return "ibu_menyusui";
+}
+
+function fmtDate(d) {
+  if (!d) return "-";
+  const dt = new Date(d);
+  return dt.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function App() {
+  const [config, setConfig] = useState(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const [keyInput, setKeyInput] = useState("");
+  const [configError, setConfigError] = useState("");
+
+  const [tab, setTab] = useState("input"); // input | data | posyandu
+  const [posyanduList, setPosyanduList] = useState([]);
+  const [penerimaList, setPenerimaList] = useState([]);
+  const [selectedPosyandu, setSelectedPosyandu] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState("");
+
+  // form state - penerima
+  const emptyForm = { nama: "", nik: "", tempat_lahir: "", tanggal_lahir: "", kategori: "", manual: false };
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
+
+  // form state - posyandu
+  const emptyPos = { kelurahan: "", padukuhan: "", nama_posyandu: "", nama_kader: "" };
+  const [posForm, setPosForm] = useState(emptyPos);
+  const [editingPosId, setEditingPosId] = useState(null);
+
+  const [filterPosyandu, setFilterPosyandu] = useState("all");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await storage.get("sb-config");
+        if (res && res.value) setConfig(JSON.parse(res.value));
+      } catch (e) {
+        // no config yet
+      }
+      setConfigLoaded(true);
+    })();
+  }, []);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2200);
+  };
+
+  const sb = useCallback(
+    async (path, options = {}) => {
+      if (!config) throw new Error("no config");
+      const res = await fetch(`${config.url}/rest/v1/${path}`, {
+        ...options,
+        headers: {
+          apikey: config.key,
+          Authorization: `Bearer ${config.key}`,
+          "Content-Type": "application/json",
+          Prefer: options.prefer || "return=representation",
+          ...(options.headers || {}),
+        },
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      const text = await res.text();
+      return text ? JSON.parse(text) : null;
+    },
+    [config]
+  );
+
+  const loadAll = useCallback(async () => {
+    if (!config) return;
+    setLoading(true);
+    try {
+      const [pos, pen] = await Promise.all([
+        sb("posyandu?select=*&order=nama_posyandu.asc"),
+        sb("penerima?select=*&order=created_at.desc"),
+      ]);
+      setPosyanduList(pos || []);
+      setPenerimaList(pen || []);
+    } catch (e) {
+      showToast("Gagal memuat data: koneksi/kredensial bermasalah");
+    } finally {
+      setLoading(false);
+    }
+  }, [config, sb]);
+
+  useEffect(() => {
+    if (config) loadAll();
+  }, [config, loadAll]);
+
+  const saveConfig = async () => {
+    setConfigError("");
+    if (!urlInput.trim() || !keyInput.trim()) {
+      setConfigError("URL dan anon key wajib diisi");
+      return;
+    }
+    const cleanUrl = urlInput.trim().replace(/\/+$/, "");
+    try {
+      const testRes = await fetch(`${cleanUrl}/rest/v1/posyandu?select=id&limit=1`, {
+        headers: { apikey: keyInput.trim(), Authorization: `Bearer ${keyInput.trim()}` },
+      });
+      if (!testRes.ok && testRes.status !== 200 && testRes.status !== 206) {
+        const t = await testRes.text();
+        setConfigError(`Koneksi gagal (${testRes.status}). Pastikan tabel sudah dibuat lewat schema.sql. Detail: ${t.slice(0, 120)}`);
+        return;
+      }
+    } catch (e) {
+      setConfigError("Tidak bisa terhubung. Cek URL project Supabase kamu.");
+      return;
+    }
+    const cfg = { url: cleanUrl, key: keyInput.trim() };
+    await storage.set("sb-config", JSON.stringify(cfg));
+    setConfig(cfg);
+  };
+
+  const resetConfig = async () => {
+    await storage.delete("sb-config").catch(() => {});
+    setConfig(null);
+    setUrlInput("");
+    setKeyInput("");
+  };
+
+  // ---- Posyandu CRUD ----
+  const submitPosyandu = async () => {
+    if (!posForm.kelurahan || !posForm.padukuhan || !posForm.nama_posyandu) {
+      showToast("Kelurahan, padukuhan, dan nama posyandu wajib diisi");
+      return;
+    }
+    try {
+      if (editingPosId) {
+        await sb(`posyandu?id=eq.${editingPosId}`, { method: "PATCH", body: JSON.stringify(posForm) });
+        showToast("Posyandu diperbarui");
+      } else {
+        await sb("posyandu", { method: "POST", body: JSON.stringify(posForm) });
+        showToast("Posyandu ditambahkan");
+      }
+      setPosForm(emptyPos);
+      setEditingPosId(null);
+      loadAll();
+    } catch (e) {
+      showToast("Gagal menyimpan posyandu");
+    }
+  };
+
+  const deletePosyandu = async (id) => {
+    if (!confirm("Hapus posyandu ini beserta seluruh data penerimanya?")) return;
+    try {
+      await sb(`posyandu?id=eq.${id}`, { method: "DELETE" });
+      showToast("Posyandu dihapus");
+      loadAll();
+    } catch (e) {
+      showToast("Gagal menghapus");
+    }
+  };
+
+  // ---- Penerima CRUD ----
+  const handleTanggalChange = (val) => {
+    setForm((f) => ({ ...f, tanggal_lahir: val, kategori: f.manual ? f.kategori : calcKategori(val) }));
+  };
+
+  const submitPenerima = async () => {
+    if (!selectedPosyandu) {
+      showToast("Pilih posyandu terlebih dahulu");
+      return;
+    }
+    if (!form.nama || !form.kategori) {
+      showToast("Nama dan kategori wajib diisi");
+      return;
+    }
+    const payload = {
+      posyandu_id: selectedPosyandu,
+      nama: form.nama,
+      nik: form.nik,
+      tempat_lahir: form.tempat_lahir,
+      tanggal_lahir: form.tanggal_lahir || null,
+      kategori: form.kategori,
+      kategori_manual: form.manual,
+    };
+    try {
+      if (editingId) {
+        await sb(`penerima?id=eq.${editingId}`, { method: "PATCH", body: JSON.stringify(payload) });
+        showToast("Data diperbarui");
+      } else {
+        await sb("penerima", { method: "POST", body: JSON.stringify(payload) });
+        showToast("Data ditambahkan");
+      }
+      setForm(emptyForm);
+      setEditingId(null);
+      loadAll();
+    } catch (e) {
+      showToast("Gagal menyimpan data");
+    }
+  };
+
+  const editPenerima = (p) => {
+    setSelectedPosyandu(p.posyandu_id);
+    setForm({
+      nama: p.nama,
+      nik: p.nik || "",
+      tempat_lahir: p.tempat_lahir || "",
+      tanggal_lahir: p.tanggal_lahir || "",
+      kategori: p.kategori,
+      manual: p.kategori_manual,
+    });
+    setEditingId(p.id);
+    setTab("input");
+  };
+
+  const deletePenerima = async (id) => {
+    if (!confirm("Hapus data penerima ini?")) return;
+    try {
+      await sb(`penerima?id=eq.${id}`, { method: "DELETE" });
+      showToast("Data dihapus");
+      loadAll();
+    } catch (e) {
+      showToast("Gagal menghapus");
+    }
+  };
+
+  const posyanduMap = useMemo(() => {
+    const m = {};
+    posyanduList.forEach((p) => (m[p.id] = p));
+    return m;
+  }, [posyanduList]);
+
+  const filteredPenerima = useMemo(() => {
+    if (filterPosyandu === "all") return penerimaList;
+    return penerimaList.filter((p) => p.posyandu_id === filterPosyandu);
+  }, [penerimaList, filterPosyandu]);
+
+  const exportExcel = () => {
+    const rows = filteredPenerima.map((p, i) => {
+      const pos = posyanduMap[p.posyandu_id] || {};
+      return {
+        No: i + 1,
+        Kelurahan: pos.kelurahan || "",
+        Padukuhan: pos.padukuhan || "",
+        Posyandu: pos.nama_posyandu || "",
+        Kader: pos.nama_kader || "",
+        Nama: p.nama,
+        NIK: p.nik || "",
+        "Tempat Lahir": p.tempat_lahir || "",
+        "Tanggal Lahir": p.tanggal_lahir ? fmtDate(p.tanggal_lahir) : "",
+        Kategori: CATEGORY_META[p.kategori]?.label || p.kategori,
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 4 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
+      { wch: 22 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Penerima MBG B3");
+    XLSX.writeFile(wb, `data-penerima-mbg-b3-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const doPrint = () => window.print();
+
+  // ---------- RENDER ----------
+
+  if (!configLoaded) {
+    return <div style={{ minHeight: "100vh", background: "#FAF7F2" }} />;
+  }
+
+  if (!config) {
+    return (
+      <div style={styles.setupWrap}>
+        <style>{fontImport}</style>
+        <div style={styles.setupCard}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+            <div style={styles.logoDot} />
+            <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 0.4, color: "#0F5257" }}>
+              MBG B3 · Entri Data
+            </span>
+          </div>
+          <h1 style={styles.setupTitle}>Hubungkan ke Supabase</h1>
+          <p style={styles.setupSub}>
+            Masukkan URL dan anon key project Supabase kamu. Sudah menjalankan schema.sql di SQL Editor? Kalau belum, jalankan dulu lalu kembali ke sini.
+          </p>
+          <label style={styles.label}>Project URL</label>
+          <input
+            style={styles.input}
+            placeholder="https://xxxxxxxx.supabase.co"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+          />
+          <label style={styles.label}>Anon public key</label>
+          <input
+            style={styles.input}
+            placeholder="eyJhbGciOi..."
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+          />
+          {configError && <div style={styles.errorBox}>{configError}</div>}
+          <button style={styles.primaryBtn} onClick={saveConfig}>Hubungkan</button>
+          <p style={styles.setupNote}>Kredensial disimpan hanya di browser ini, tidak dibagikan ke siapa pun.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const kategoriOptions = Object.entries(CATEGORY_META);
+
+  return (
+    <div style={styles.appWrap} className="mbg-app">
+      <style>{fontImport + printStyles}</style>
+
+      {/* Header */}
+      <div style={styles.header} className="no-print">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={styles.logoDot} />
+          <span style={styles.headerTitle}>MBG B3 · Entri Data</span>
+        </div>
+        <button style={styles.iconBtn} onClick={resetConfig} title="Putuskan koneksi">
+          <LogOut size={16} color="#0F5257" />
+        </button>
+      </div>
+
+      {toast && <div style={styles.toast}>{toast}</div>}
+
+      <div style={styles.content} className="mbg-content">
+        {tab === "posyandu" && (
+          <div>
+            <h2 style={styles.sectionTitle}>Data Posyandu</h2>
+            <div style={styles.card}>
+              <div style={styles.grid2}>
+                <div>
+                  <label style={styles.label}>Kelurahan</label>
+                  <input style={styles.input} value={posForm.kelurahan} onChange={(e) => setPosForm({ ...posForm, kelurahan: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Padukuhan</label>
+                  <input style={styles.input} value={posForm.padukuhan} onChange={(e) => setPosForm({ ...posForm, padukuhan: e.target.value })} />
+                </div>
+              </div>
+              <label style={styles.label}>Nama Posyandu</label>
+              <input style={styles.input} value={posForm.nama_posyandu} onChange={(e) => setPosForm({ ...posForm, nama_posyandu: e.target.value })} />
+              <label style={styles.label}>Nama Kader</label>
+              <input style={styles.input} value={posForm.nama_kader} onChange={(e) => setPosForm({ ...posForm, nama_kader: e.target.value })} />
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button style={styles.primaryBtn} onClick={submitPosyandu}>
+                  {editingPosId ? <><Check size={15} style={{ marginRight: 6 }} />Simpan Perubahan</> : <><Plus size={15} style={{ marginRight: 6 }} />Tambah Posyandu</>}
+                </button>
+                {editingPosId && (
+                  <button style={styles.ghostBtn} onClick={() => { setPosForm(emptyPos); setEditingPosId(null); }}>
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 14 }}>
+              {posyanduList.length === 0 && !loading && (
+                <div style={styles.emptyState}>Belum ada posyandu. Tambahkan lewat form di atas.</div>
+              )}
+              {posyanduList.map((p) => (
+                <div key={p.id} style={styles.posCard}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: "#1F2937", fontSize: 15 }}>{p.nama_posyandu}</div>
+                    <div style={{ fontSize: 12.5, color: "#6B7280", marginTop: 2 }}>
+                      {p.padukuhan}, {p.kelurahan}
+                    </div>
+                    {p.nama_kader && <div style={{ fontSize: 12.5, color: "#0F5257", marginTop: 2 }}>Kader: {p.nama_kader}</div>}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button style={styles.iconBtnSm} onClick={() => { setPosForm({ kelurahan: p.kelurahan, padukuhan: p.padukuhan, nama_posyandu: p.nama_posyandu, nama_kader: p.nama_kader || "" }); setEditingPosId(p.id); }}>
+                      <Pencil size={14} color="#0F5257" />
+                    </button>
+                    <button style={styles.iconBtnSm} onClick={() => deletePosyandu(p.id)}>
+                      <Trash2 size={14} color="#C1666B" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "input" && (
+          <div>
+            <h2 style={styles.sectionTitle}>{editingId ? "Ubah Data Penerima" : "Input Penerima Manfaat"}</h2>
+            <div style={styles.card}>
+              <label style={styles.label}>Posyandu</label>
+              <select style={styles.input} value={selectedPosyandu} onChange={(e) => setSelectedPosyandu(e.target.value)}>
+                <option value="">— Pilih posyandu —</option>
+                {posyanduList.map((p) => (
+                  <option key={p.id} value={p.id}>{p.nama_posyandu} · {p.padukuhan}</option>
+                ))}
+              </select>
+              {posyanduList.length === 0 && (
+                <div style={{ fontSize: 12.5, color: "#C1666B", marginTop: 6 }}>
+                  Belum ada posyandu. Buka tab Posyandu untuk menambahkan.
+                </div>
+              )}
+
+              <label style={styles.label}>Nama</label>
+              <input style={styles.input} value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} placeholder="Nama lengkap" />
+
+              <label style={styles.label}>NIK</label>
+              <input
+                style={styles.input}
+                value={form.nik}
+                maxLength={16}
+                inputMode="numeric"
+                onChange={(e) => setForm({ ...form, nik: e.target.value.replace(/\D/g, "") })}
+                placeholder="16 digit NIK"
+              />
+
+              <div style={styles.grid2}>
+                <div>
+                  <label style={styles.label}>Tempat Lahir</label>
+                  <input style={styles.input} value={form.tempat_lahir} onChange={(e) => setForm({ ...form, tempat_lahir: e.target.value })} />
+                </div>
+                <div>
+                  <label style={styles.label}>Tanggal Lahir</label>
+                  <input type="date" style={styles.input} value={form.tanggal_lahir} onChange={(e) => handleTanggalChange(e.target.value)} />
+                </div>
+              </div>
+
+              <label style={styles.label}>Kategori Sasaran</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                {kategoriOptions.map(([key, meta]) => (
+                  <button
+                    key={key}
+                    onClick={() => setForm({ ...form, kategori: key, manual: true })}
+                    style={{
+                      ...styles.catChip,
+                      background: form.kategori === key ? meta.color : meta.bg,
+                      color: form.kategori === key ? "#fff" : meta.color,
+                      border: `1px solid ${meta.color}`,
+                    }}
+                  >
+                    {meta.label}
+                  </button>
+                ))}
+              </div>
+              {form.tanggal_lahir && (
+                <div style={{ fontSize: 11.5, color: "#9CA3AF", marginTop: 6 }}>
+                  {form.manual ? "Kategori dipilih manual." : "Kategori otomatis dari tanggal lahir — tap chip lain untuk ubah manual."}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button style={styles.primaryBtn} onClick={submitPenerima}>
+                  {editingId ? <><Check size={15} style={{ marginRight: 6 }} />Simpan Perubahan</> : <><Plus size={15} style={{ marginRight: 6 }} />Simpan Data</>}
+                </button>
+                {editingId && (
+                  <button style={styles.ghostBtn} onClick={() => { setForm(emptyForm); setEditingId(null); }}>
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "data" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <h2 style={styles.sectionTitle}>Rekap Data</h2>
+              <div style={{ display: "flex", gap: 8 }} className="no-print">
+                <button style={styles.smallBtn} onClick={exportExcel}><Download size={14} style={{ marginRight: 5 }} />Excel</button>
+                <button style={styles.smallBtn} onClick={doPrint}><Printer size={14} style={{ marginRight: 5 }} />Cetak</button>
+              </div>
+            </div>
+
+            <div className="no-print" style={{ marginBottom: 10 }}>
+              <select style={styles.input} value={filterPosyandu} onChange={(e) => setFilterPosyandu(e.target.value)}>
+                <option value="all">Semua posyandu ({penerimaList.length})</option>
+                {posyanduList.map((p) => (
+                  <option key={p.id} value={p.id}>{p.nama_posyandu}</option>
+                ))}
+              </select>
+            </div>
+
+            {filteredPenerima.length === 0 && !loading && (
+              <div style={styles.emptyState}>Belum ada data penerima untuk filter ini.</div>
+            )}
+
+            <div id="print-area">
+              <div className="print-only" style={{ display: "none" }}>
+                <h1 style={{ fontSize: 16, marginBottom: 2 }}>Data Penerima Manfaat MBG B3</h1>
+                <div style={{ fontSize: 11, color: "#555", marginBottom: 10 }}>
+                  Dicetak {new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}
+                </div>
+              </div>
+
+              {/* Mobile card list (hidden on print) */}
+              <div className="card-list no-print">
+                {filteredPenerima.map((p) => {
+                  const meta = CATEGORY_META[p.kategori] || {};
+                  const pos = posyanduMap[p.posyandu_id];
+                  return (
+                    <div key={p.id} style={styles.dataCard}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 14.5, color: "#1F2937" }}>{p.nama}</div>
+                          <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{pos?.nama_posyandu || "-"}</div>
+                          <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>
+                            {p.nik ? `NIK ${p.nik}` : "NIK -"} · {p.tempat_lahir || "-"}, {fmtDate(p.tanggal_lahir)}
+                          </div>
+                        </div>
+                        <span style={{ ...styles.catBadge, background: meta.bg, color: meta.color }}>{meta.label}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                        <button style={styles.iconBtnSm} onClick={() => editPenerima(p)}><Pencil size={13} color="#0F5257" /></button>
+                        <button style={styles.iconBtnSm} onClick={() => deletePenerima(p.id)}><Trash2 size={13} color="#C1666B" /></button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Table for desktop + print */}
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>No</th><th>Posyandu</th><th>Nama</th><th>NIK</th><th>Tempat, Tgl Lahir</th><th>Kategori</th><th className="no-print">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPenerima.map((p, i) => {
+                    const meta = CATEGORY_META[p.kategori] || {};
+                    const pos = posyanduMap[p.posyandu_id];
+                    return (
+                      <tr key={p.id}>
+                        <td>{i + 1}</td>
+                        <td>{pos?.nama_posyandu || "-"}</td>
+                        <td>{p.nama}</td>
+                        <td>{p.nik || "-"}</td>
+                        <td>{p.tempat_lahir || "-"}, {fmtDate(p.tanggal_lahir)}</td>
+                        <td><span className="print-cat" style={{ color: meta.color }}>{meta.label}</span></td>
+                        <td className="no-print">
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button style={styles.iconBtnSm} onClick={() => editPenerima(p)}><Pencil size={13} color="#0F5257" /></button>
+                            <button style={styles.iconBtnSm} onClick={() => deletePenerima(p.id)}><Trash2 size={13} color="#C1666B" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom nav */}
+      <div style={styles.bottomNav} className="no-print">
+        <NavBtn active={tab === "input"} icon={<ClipboardList size={19} />} label="Input" onClick={() => setTab("input")} />
+        <NavBtn active={tab === "data"} icon={<Users2 size={19} />} label="Data" onClick={() => setTab("data")} />
+        <NavBtn active={tab === "posyandu"} icon={<MapPinned size={19} />} label="Posyandu" onClick={() => setTab("posyandu")} />
+      </div>
+    </div>
+  );
+}
+
+function NavBtn({ active, icon, label, onClick }) {
+  return (
+    <button onClick={onClick} style={{ ...styles.navBtn, color: active ? "#0F5257" : "#9CA3AF" }}>
+      {icon}
+      <span style={{ fontSize: 11, marginTop: 3, fontWeight: active ? 700 : 500 }}>{label}</span>
+    </button>
+  );
+}
+
+const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');`;
+
+const printStyles = `
+  @media print {
+    .no-print { display: none !important; }
+    .card-list { display: none !important; }
+    .print-only { display: block !important; }
+    .mbg-app { padding: 0 !important; max-width: 100% !important; }
+    .mbg-content { padding: 0 !important; }
+    body { background: #fff !important; }
+  }
+  @media screen {
+    .print-only { display: none !important; }
+  }
+  .data-table { display: none; width: 100%; border-collapse: collapse; font-size: 12.5px; font-family: 'Inter', sans-serif; }
+  @media print {
+    .data-table { display: table !important; }
+  }
+  @media (min-width: 860px) {
+    .data-table { display: table; }
+    .card-list { display: none !important; }
+  }
+  .data-table th, .data-table td { border: 1px solid #E5E7EB; padding: 6px 8px; text-align: left; }
+  .data-table th { background: #F3F4F6; font-weight: 700; color: #374151; }
+`;
+
+const styles = {
+  setupWrap: {
+    minHeight: "100vh", background: "#FAF7F2", display: "flex", alignItems: "center",
+    justifyContent: "center", padding: 20, fontFamily: "'Inter', sans-serif",
+  },
+  setupCard: {
+    background: "#fff", borderRadius: 18, padding: 28, maxWidth: 380, width: "100%",
+    boxShadow: "0 8px 30px rgba(15,82,87,0.08)", border: "1px solid #EFEAE0",
+  },
+  setupTitle: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 21, fontWeight: 800, color: "#1F2937", margin: "10px 0 6px" },
+  setupSub: { fontSize: 13, color: "#6B7280", lineHeight: 1.5, marginBottom: 18 },
+  setupNote: { fontSize: 11.5, color: "#9CA3AF", marginTop: 12, textAlign: "center" },
+  logoDot: { width: 10, height: 10, borderRadius: 3, background: "#2F9C95" },
+  label: { display: "block", fontSize: 12, fontWeight: 600, color: "#4B5563", margin: "12px 0 4px" },
+  input: {
+    width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E7EB",
+    fontSize: 14, fontFamily: "'Inter', sans-serif", color: "#1F2937", boxSizing: "border-box", background: "#fff",
+  },
+  errorBox: { background: "#FBEAEB", color: "#C1666B", fontSize: 12.5, padding: "8px 10px", borderRadius: 8, marginTop: 10 },
+  primaryBtn: {
+    width: "100%", background: "#0F5257", color: "#fff", border: "none", borderRadius: 10,
+    padding: "11px 16px", fontSize: 14, fontWeight: 700, marginTop: 16, display: "flex",
+    alignItems: "center", justifyContent: "center", cursor: "pointer", fontFamily: "'Inter', sans-serif",
+  },
+  ghostBtn: {
+    background: "#F3F4F6", border: "1px solid #E5E7EB", borderRadius: 10, padding: "11px 14px",
+    marginTop: 16, cursor: "pointer", display: "flex", alignItems: "center",
+  },
+  appWrap: {
+    minHeight: "100vh", background: "#FAF7F2", fontFamily: "'Inter', sans-serif",
+    maxWidth: 860, margin: "0 auto", paddingBottom: 70, position: "relative",
+  },
+  header: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "14px 16px", background: "#fff", borderBottom: "1px solid #EFEAE0",
+    position: "sticky", top: 0, zIndex: 10,
+  },
+  headerTitle: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: 14, color: "#0F5257" },
+  iconBtn: { background: "#F3F4F6", border: "none", borderRadius: 8, padding: 8, cursor: "pointer" },
+  iconBtnSm: { background: "#F3F4F6", border: "none", borderRadius: 7, padding: 6, cursor: "pointer", display: "flex" },
+  content: { padding: "16px" },
+  sectionTitle: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, fontWeight: 800, color: "#1F2937", marginBottom: 12 },
+  card: { background: "#fff", borderRadius: 16, padding: 16, border: "1px solid #EFEAE0" },
+  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+  catChip: { padding: "7px 12px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, cursor: "pointer" },
+  posCard: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    background: "#fff", border: "1px solid #EFEAE0", borderRadius: 14, padding: "12px 14px", marginBottom: 8,
+  },
+  dataCard: { background: "#fff", border: "1px solid #EFEAE0", borderRadius: 14, padding: "12px 14px", marginBottom: 8 },
+  catBadge: { fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap" },
+  emptyState: { textAlign: "center", color: "#9CA3AF", fontSize: 13, padding: "30px 10px" },
+  smallBtn: {
+    background: "#fff", border: "1px solid #0F5257", color: "#0F5257", borderRadius: 9,
+    padding: "7px 12px", fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", cursor: "pointer",
+  },
+  bottomNav: {
+    position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 860,
+    background: "#fff", borderTop: "1px solid #EFEAE0", display: "flex", justifyContent: "space-around",
+    padding: "8px 0 10px", boxShadow: "0 -4px 16px rgba(0,0,0,0.04)",
+  },
+  navBtn: { background: "none", border: "none", display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" },
+  toast: {
+    position: "fixed", top: 60, left: "50%", transform: "translateX(-50%)", background: "#1F2937",
+    color: "#fff", fontSize: 12.5, padding: "8px 16px", borderRadius: 999, zIndex: 50,
+  },
+};
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
